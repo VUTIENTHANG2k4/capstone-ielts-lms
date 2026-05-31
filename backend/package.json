@@ -1,0 +1,36 @@
+{
+  "name": "ielts-lms-backend",
+  "version": "1.0.0",
+  "description": "IELTS Academy LMS - Backend API",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "npm install",
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "seed": "node src/seed.js",
+    "seed:v2": "node src/seed-v2.js",
+    "test:integration": "node ../tests/integration-full-flow.mjs",
+    "test:full": "npm run seed:v2 && npm run test:integration"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.14",
+    "express-validator": "^7.2.0",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

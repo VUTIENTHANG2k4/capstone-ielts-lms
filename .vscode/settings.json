@@ -1,0 +1,8 @@
+{
+     "chat.tools.terminal.autoApprove": {
+          "/^cd d:\\\\project\\\\IELTS-Lms\\\\frontend; npm install recharts$/": {
+               "approve": true,
+               "matchCommandLine": true
+          }
+     }
+}

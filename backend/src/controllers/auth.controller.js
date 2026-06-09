@@ -4,6 +4,18 @@ const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const { sendMail } = require('../services/mailer.service');
 
+// Single source of truth for token lifetime. The frontend reads the JWT
+// `exp` claim directly, so changing this value keeps both sides in sync.
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+
+function signToken(user) {
+  return jwt.sign(
+    { userId: user.id, email: user.email, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+}
+
 const register = async (req, res) => {
   try {
     const { email, password, full_name } = req.body;
@@ -41,11 +53,7 @@ const register = async (req, res) => {
 
     if (error) throw error;
 
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+    const token = signToken(user);
 
     res.status(201).json({ user, token });
   } catch (err) {
@@ -81,11 +89,7 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Email hoặc mật khẩu không chính xác.' });
     }
 
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+    const token = signToken(user);
 
     const { password_hash, ...userData } = user;
     res.json({ user: userData, token });
@@ -145,12 +149,17 @@ const changePassword = async (req, res) => {
     }
 
     const password_hash = await bcrypt.hash(new_password, 10);
+    // Bumping tokens_valid_from revokes every JWT issued before now.
     await supabase
       .from('core_ielts_lms_users')
-      .update({ password_hash })
+      .update({ password_hash, tokens_valid_from: new Date().toISOString() })
       .eq('id', req.user.id);
 
-    res.json({ message: 'Đổi mật khẩu thành công.' });
+    // Re-issue a token for the current client so this session stays alive
+    // while all OTHER outstanding tokens (other devices) are now revoked.
+    const token = signToken({ id: req.user.id, email: req.user.email, role: req.user.role });
+
+    res.json({ message: 'Đổi mật khẩu thành công.', token });
   } catch (err) {
     console.error('Change password error:', err);
     res.status(500).json({ error: 'Đổi mật khẩu thất bại. Vui lòng thử lại.' });
@@ -212,7 +221,10 @@ const resetPassword = async (req, res) => {
     if (new Date(row.expires_at) < new Date()) return res.status(400).json({ error: 'Token đã hết hạn.' });
 
     const password_hash = await bcrypt.hash(new_password, 10);
-    await supabase.from('core_ielts_lms_users').update({ password_hash }).eq('id', row.user_id);
+    // Revoke all outstanding JWTs for this user (they must log in again).
+    await supabase.from('core_ielts_lms_users')
+      .update({ password_hash, tokens_valid_from: new Date().toISOString() })
+      .eq('id', row.user_id);
     await supabase.from('core_ielts_lms_password_reset_tokens').update({ used_at: new Date().toISOString() }).eq('id', row.id);
 
     res.json({ message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.' });
